@@ -1,0 +1,32 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+service_account.json
+*service_account*.json
+# 구글 클라우드에서 키를 재발급받으면 파일명이 <프로젝트id>-<해시>.json 형태로 떨어져
+# 위 패턴에 걸리지 않는다. 루트의 json은 통째로 막아 실수로 커밋되는 것을 방지한다.
+/*.json
+*.pem
+*.key
+
+# Database
+*.db
+*.sqlite3
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# 저장소에 포함하지 않는 로컬 문서
+# GUIDE.md: README/docs 와 내용이 겹치는 통합 가이드
+# blog-tailscale.md: 이 프로젝트와 별개인 블로그 초안
+GUIDE.md
+blog-tailscale.md
