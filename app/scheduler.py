@@ -90,6 +90,19 @@ def _reschedule(registration_id: int, after: datetime | None = None) -> None:
         _schedule_retry(registration_id, after, "예약 처리 중 오류")
 
 
+def _already_sent(registration, target_dt: datetime) -> bool:
+    """이 행을 이미 발송했는지. 재시작으로 같은 행이 다시 선택됐을 때를 걸러낸다.
+
+    SQLite 는 tzinfo 를 보존하지 않아 읽어올 때 naive 가 되므로,
+    비교 전에 설정된 타임존을 다시 붙인다 (저장할 때는 항상 그 타임존의 값이다)."""
+    last = registration.last_sent_row_at
+    if last is None:
+        return False
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=TZ)
+    return last == target_dt
+
+
 def _send_notice(registration_id: int, target_dt: datetime) -> bool:
     """`target_dt`와 일치하는 행을 시트에서 다시 읽어 팀원들에게 발송한다.
     시트 등록이 이미 삭제되어 이어갈 체인이 없으면 False를 반환한다."""
@@ -98,6 +111,11 @@ def _send_notice(registration_id: int, target_dt: datetime) -> bool:
         registration = sheet_repository.get_by_id(db, registration_id)
         if registration is None:
             return False
+
+        if _already_sent(registration, target_dt):
+            logger.info("[%s] %s 는 이미 발송함 - 건너뜀 (재시작 등으로 다시 선택된 행)",
+                        registration.name, target_dt)
+            return True
 
         # 수신자 확인을 시트 읽기보다 먼저 한다. 연결된 팀이 없으면 어차피 아무도 못 받으므로
         # 구글 API 를 호출할 이유가 없다. 발송만 건너뛰고 체인은 이어가므로,
@@ -114,6 +132,7 @@ def _send_notice(registration_id: int, target_dt: datetime) -> bool:
             logger.info("[%s] %s에 해당하는 행 없음", registration.name, target_dt)
         else:
             logger.info("[%s] %s 발송 완료 (수신자 %d명)", registration.name, target_dt, len(result.recipients))
+            sheet_repository.mark_sent(db, registration, target_dt)
         return True
     finally:
         db.close()

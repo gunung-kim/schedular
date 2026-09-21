@@ -20,8 +20,8 @@ service_account.json
 *.db
 *.sqlite3
 # 마이그레이션이 남기는 백업 (실제 데이터가 들어 있다)
-*.db.bak
-*.sqlite3.bak
+*.db.bak*
+*.sqlite3.bak*
 
 # OS / IDE
 .DS_Store

@@ -40,6 +40,10 @@ class SheetRegistration(Base):
     data_cols = Column(String, nullable=False)          # 예: "B:D"
     header_row = Column(Integer, nullable=False, default=1)  # 데이터가 시작되는 행 번호 (1부터 시작, 제목행 제외)
     time_format = Column(String, nullable=False, default="%H시")  # time_col 각 셀과 대조할 strftime 패턴
+    # 마지막으로 발송을 끝낸 행 시각. 알림 시점과 행 시각 사이에 서버가 재시작되면
+    # 같은 행을 다시 "다음 행"으로 고르게 되는데, 이 기록이 중복 발송을 막는다.
+    # 프로세스 메모리가 아니라 DB 에 두어야 재시작을 넘어 유지된다.
+    last_sent_row_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(TZ))
 
 

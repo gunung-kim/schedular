@@ -178,3 +178,47 @@ def test_감시job은_처리중인_시트를_건드리지_않는다(scheduler, m
         assert _job(scheduler, sheet) is None
     finally:
         scheduler._in_flight.discard(sheet.id)
+
+
+def test_이미_보낸_행은_다시_보내지_않는다(scheduler, make_sheet, sheet_rows, make_team, link, sent):
+    """알림 시점과 행 시각 사이에 서버가 재시작되면 같은 행이 다시 '다음 행'으로
+    선택된다. 발송 예정 시각은 이미 지났으므로 즉시 발송되어 중복이 된다."""
+    sheet = make_sheet(time_format="%H:%M")
+    link(sheet, make_team("운영팀", ["a@example.com"]))
+    # 지금으로부터 5분 뒤 행 = 알림 시점(10분 전)은 이미 지난 상태
+    row = (datetime.now(TZ) + timedelta(minutes=5)).replace(second=0, microsecond=0)
+    sheet_rows([row.strftime("%H:%M")])
+
+    for _ in range(3):                      # 재시작 3회
+        scheduler.schedule_sheet(sheet.id)
+        job = _job(scheduler, sheet)
+        if job is not None and job.func is scheduler._fire:
+            scheduler._fire(sheet.id, job.args[1])
+
+    assert len(sent) == 1
+
+
+def test_발송_후_마지막_행_시각이_기록된다(scheduler, db, make_sheet, sheet_rows, make_team, link, sent):
+    sheet = make_sheet(time_format="%H:%M")
+    link(sheet, make_team("운영팀", ["a@example.com"]))
+    row = (datetime.now(TZ) + timedelta(minutes=5)).replace(second=0, microsecond=0)
+    sheet_rows([row.strftime("%H:%M")])
+
+    scheduler._fire(sheet.id, row)
+    db.expire_all()
+    saved = sheet_repository.get_by_id(db, sheet.id).last_sent_row_at
+    assert saved is not None
+    if saved.tzinfo is None:          # SQLite 는 tzinfo 를 보존하지 않는다
+        saved = saved.replace(tzinfo=TZ)
+    assert saved == row
+
+
+def test_발송하지_않았으면_기록도_남지_않는다(scheduler, db, make_sheet, sheet_rows, sent):
+    """연결된 팀이 없어 건너뛴 경우, 나중에 팀을 연결하면 발송되어야 한다."""
+    sheet = make_sheet(time_format="%H:%M")
+    row = (datetime.now(TZ) + timedelta(minutes=5)).replace(second=0, microsecond=0)
+    sheet_rows([row.strftime("%H:%M")])
+
+    scheduler._fire(sheet.id, row)
+    db.expire_all()
+    assert sheet_repository.get_by_id(db, sheet.id).last_sent_row_at is None

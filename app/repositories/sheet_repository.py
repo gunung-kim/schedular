@@ -25,6 +25,12 @@ def get_by_id(db: Session, sheet_id: int) -> SheetRegistration | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
+def mark_sent(db: Session, sheet: SheetRegistration, row_dt) -> None:
+    """방금 발송을 끝낸 행 시각을 기록한다."""
+    sheet.last_sent_row_at = row_dt
+    db.commit()
+
+
 def delete(db: Session, sheet: SheetRegistration) -> None:
     db.delete(sheet)
     db.commit()
