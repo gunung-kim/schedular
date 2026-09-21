@@ -11,7 +11,7 @@ from app.config import (
     WATCHDOG_INTERVAL_MINUTES,
 )
 from app.database import SessionLocal
-from app.repositories import sheet_repository
+from app.repositories import member_repository, sheet_repository
 from app.services import notification_service, sheet_service
 
 logger = logging.getLogger("scheduler")
@@ -98,6 +98,16 @@ def _send_notice(registration_id: int, target_dt: datetime) -> bool:
         registration = sheet_repository.get_by_id(db, registration_id)
         if registration is None:
             return False
+
+        # 수신자 확인을 시트 읽기보다 먼저 한다. 연결된 팀이 없으면 어차피 아무도 못 받으므로
+        # 구글 API 를 호출할 이유가 없다. 발송만 건너뛰고 체인은 이어가므로,
+        # 나중에 팀을 연결하면 다음 행부터 자동으로 발송이 재개된다.
+        if not member_repository.get_emails_for_sheet(db, registration_id):
+            logger.warning(
+                "[%s] 연결된 팀이 없어 발송하지 않음 - POST /sheets/%d/teams/{team_id} 로 팀을 연결하세요",
+                registration.name, registration_id,
+            )
+            return True
 
         result = notification_service.send_row_notice(db, registration, target_dt)
         if result is None:

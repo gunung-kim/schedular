@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.config import TZ
 from app.models import SheetRegistration
-from app.repositories import sheet_repository
+from app.repositories import sheet_repository, team_repository
 from app.schemas.sheet import SheetRegistrationCreate
 from app.services import google_sheets_client
 
@@ -21,8 +21,35 @@ def create_sheet(db: Session, payload: SheetRegistrationCreate) -> SheetRegistra
     return sheet_repository.create(db, sheet)
 
 
-def list_sheets(db: Session) -> list[SheetRegistration]:
-    return sheet_repository.get_all(db)
+def list_sheets(db: Session, team_id: int | None = None) -> list[SheetRegistration]:
+    """등록된 시트 목록. `team_id`를 주면 그 팀에 연결된 시트만 반환한다."""
+    return sheet_repository.get_all(db, team_id=team_id)
+
+
+def list_teams(db: Session, sheet_id: int):
+    """이 시트를 공유하는 팀 목록."""
+    return sheet_repository.get_teams(db, sheet_id)
+
+
+def link_team(db: Session, sheet_id: int, team_id: int) -> str:
+    """시트에 팀을 연결한다. 결과를 문자열로 알려준다:
+    "ok" | "no_sheet" | "no_team" | "already"."""
+    if sheet_repository.get_by_id(db, sheet_id) is None:
+        return "no_sheet"
+    if team_repository.get_by_id(db, team_id) is None:
+        return "no_team"
+    if sheet_repository.get_link(db, sheet_id, team_id) is not None:
+        return "already"
+    sheet_repository.link_team(db, sheet_id, team_id)
+    return "ok"
+
+
+def unlink_team(db: Session, sheet_id: int, team_id: int) -> bool:
+    link = sheet_repository.get_link(db, sheet_id, team_id)
+    if link is None:
+        return False
+    sheet_repository.unlink_team(db, link)
+    return True
 
 
 def get_sheet(db: Session, sheet_id: int) -> SheetRegistration | None:
