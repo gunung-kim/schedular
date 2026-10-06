@@ -141,5 +141,6 @@ python -m pytest
 
 ## 상세 가이드
 
+- 설계 결정과 트러블슈팅: [docs/DECISIONS.md](docs/DECISIONS.md)
 - 최초 설정(Google Cloud, 서비스 계정, Gmail 앱 비밀번호 등): [docs/SETUP.md](docs/SETUP.md)
 - 실행 및 API 사용법: [docs/USAGE.md](docs/USAGE.md)
